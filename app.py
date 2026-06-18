@@ -26,6 +26,10 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 DATASET_DIR = os.path.join(BASE_DIR, "Dataset")
 MODEL_DIR = os.path.join(BASE_DIR, "model")
 
+# Ensure required directories exist
+os.makedirs(DATASET_DIR, exist_ok=True)
+os.makedirs(MODEL_DIR, exist_ok=True)
+
 _cache = {
     "dataset": None,
     "center": None,

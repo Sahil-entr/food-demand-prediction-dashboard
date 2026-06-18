@@ -25,5 +25,5 @@ COPY . /code/
 # Expose port 7860 (Hugging Face Spaces standard port)
 EXPOSE 7860
 
-# Run the Flask app using Gunicorn on port 7860
-CMD ["gunicorn", "-b", "0.0.0.0:7860", "app:app"]
+# Run the Flask app using Gunicorn on port 7860 with a single worker
+CMD ["gunicorn", "-w", "1", "-b", "0.0.0.0:7860", "app:app"]
