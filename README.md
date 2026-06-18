@@ -1,3 +1,13 @@
+---
+title: Food Demand Prediction Dashboard
+emoji: 🥣
+colorFrom: indigo
+colorTo: blue
+sdk: docker
+app_port: 7860
+pinned: false
+---
+
 # 🥣 Food Demand & Supply Prediction Wizard Dashboard
 
 An ML-powered inventory demand forecasting dashboard designed for food supply chains. This application provides a modern, clean, and interactive single-page step-by-step wizard workflow that guides users through importing datasets, training machine learning models, comparing performance evaluation metrics, and forecasting target orders.
