@@ -84,6 +84,22 @@ function formatNumber(n) {
 
 async function apiFetch(url, options = {}) {
     const resp = await fetch(url, options);
+    
+    // Guard: if the server returned HTML instead of JSON (e.g. a 500 crash page),
+    // extract a clean error message instead of letting JSON.parse throw
+    // the cryptic "Unexpected token '<'" error.
+    const contentType = resp.headers.get("content-type") || "";
+    if (!contentType.includes("application/json")) {
+        const text = await resp.text();
+        // Try to extract a readable message from a Flask HTML error page
+        const match = text.match(/<title>([^<]+)<\/title>/i);
+        const hint = match ? match[1] : "Server returned a non-JSON response";
+        throw new Error(
+            `Server error (HTTP ${resp.status}): ${hint}. ` +
+            `Check the Flask terminal for the full traceback.`
+        );
+    }
+    
     const data = await resp.json();
     if (data.status === "error") throw new Error(data.message);
     return data;
