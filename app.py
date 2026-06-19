@@ -373,11 +373,18 @@ def train_models():
 
         results = []
 
+        # In quick mode use fewer estimators to prevent gunicorn worker timeout
+        n_est = 50 if quick_mode else 100
+
         for algo in algorithms:
             try:
+                print(f"  [Training] Starting: {algo} (quick={quick_mode})", flush=True)
+
                 if algo == "Random Forest":
                     from sklearn.ensemble import RandomForestRegressor
-                    model = RandomForestRegressor(n_estimators=100, random_state=42)
+                    model = RandomForestRegressor(
+                        n_estimators=n_est, random_state=42, n_jobs=-1
+                    )
                     model.fit(X_train, y_train)
                     pred = model.predict(X_test)
                     _cache["trained_models"][algo] = model
@@ -385,7 +392,9 @@ def train_models():
 
                 elif algo == "Gradient Boosting":
                     from sklearn.ensemble import GradientBoostingRegressor
-                    model = GradientBoostingRegressor(n_estimators=100, random_state=42)
+                    model = GradientBoostingRegressor(
+                        n_estimators=n_est, random_state=42
+                    )
                     model.fit(X_train, y_train)
                     pred = model.predict(X_test)
                     _cache["trained_models"][algo] = model
@@ -393,7 +402,9 @@ def train_models():
 
                 elif algo == "LightGBM":
                     import lightgbm as lgb
-                    model = lgb.LGBMRegressor(n_estimators=100, random_state=42, verbose=-1)
+                    model = lgb.LGBMRegressor(
+                        n_estimators=n_est, random_state=42, verbose=-1, n_jobs=-1
+                    )
                     model.fit(X_train, y_train)
                     pred = model.predict(X_test)
                     _cache["trained_models"][algo] = model
@@ -402,7 +413,7 @@ def train_models():
                 elif algo == "CatBoost":
                     import catboost as cb
                     model = cb.CatBoostRegressor(
-                        iterations=100, random_seed=42, verbose=0
+                        iterations=n_est, random_seed=42, verbose=0, thread_count=-1
                     )
                     model.fit(X_train, y_train)
                     pred = model.predict(X_test)
@@ -412,7 +423,7 @@ def train_models():
                 elif algo == "XGBoost":
                     import xgboost as xg
                     model = xg.XGBRegressor(
-                        n_estimators=100, random_state=42, verbosity=0
+                        n_estimators=n_est, random_state=42, verbosity=0, nthread=-1
                     )
                     model.fit(X_train, y_train)
                     pred = model.predict(X_test)
@@ -423,7 +434,10 @@ def train_models():
                     result = _train_keras_model(algo, X_train, X_test, y_train, y_test, quick_mode)
                     results.append(result)
 
+                print(f"  [Training] Done: {algo}", flush=True)
+
             except Exception as inner_e:
+                traceback.print_exc()
                 results.append({
                     "algorithm": algo,
                     "error": str(inner_e),
