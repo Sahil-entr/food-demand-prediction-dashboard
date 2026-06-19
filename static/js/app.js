@@ -295,12 +295,117 @@ async function uploadCSVFile(file, type, statusBadge) {
 // ---------------------------------------------------------------------------
 // Step 2: Model Training
 // ---------------------------------------------------------------------------
+
+/**
+ * Shows a prominent warning banner when user tries to train more than
+ * MAX_MODELS models at once (server would timeout under full load).
+ */
+function showTrainingLimitWarning(selectedCount) {
+    const MAX_MODELS = 5;
+    const excess = selectedCount - MAX_MODELS;
+
+    // Remove any existing warning first
+    const existing = document.getElementById("trainLimitWarning");
+    if (existing) existing.remove();
+
+    const warning = document.createElement("div");
+    warning.id = "trainLimitWarning";
+    warning.style.cssText = `
+        background: linear-gradient(135deg, #fef3c7, #fde68a);
+        border: 2px solid #f59e0b;
+        border-radius: 12px;
+        padding: 20px 24px;
+        margin-bottom: 20px;
+        display: flex;
+        align-items: flex-start;
+        gap: 16px;
+        animation: slideUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    `;
+
+    warning.innerHTML = `
+        <div style="font-size: 2rem; flex-shrink: 0; line-height: 1;">⚠️</div>
+        <div style="flex: 1;">
+            <div style="font-family: 'Outfit', sans-serif; font-size: 1.1rem; font-weight: 700;
+                        color: #92400e; margin-bottom: 6px; letter-spacing: -0.01em;">
+                YOU CANNOT TRAIN ALL MODELS AT ONCE
+            </div>
+            <div style="font-size: 0.88rem; color: #78350f; line-height: 1.5;">
+                You have selected <strong>${selectedCount} models</strong>, but the server can only 
+                handle up to <strong>${MAX_MODELS} models</strong> per training session without timing out.<br>
+                Please <strong>deselect at least ${excess} model${excess > 1 ? "s" : ""}</strong> 
+                and try again. We recommend keeping <em>either</em> the tree models 
+                <em>or</em> the neural networks (LSTM / Bi-LSTM / CNN) in a single run.
+            </div>
+            <div style="margin-top: 12px; display: flex; gap: 10px; flex-wrap: wrap;">
+                <button onclick="autoSelectFast()" style="
+                    background: #f59e0b; color: white; border: none; border-radius: 8px;
+                    padding: 8px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                    ⚡ Select Fast Models Only (RF, GB, LGB, CB, XGB)
+                </button>
+                <button onclick="autoSelectNeural()" style="
+                    background: #8b5cf6; color: white; border: none; border-radius: 8px;
+                    padding: 8px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                    🧠 Select Neural Nets Only (LSTM, Bi-LSTM, CNN)
+                </button>
+                <button onclick="document.getElementById('trainLimitWarning').remove()" style="
+                    background: white; color: #78350f; border: 1px solid #f59e0b; border-radius: 8px;
+                    padding: 8px 16px; font-size: 0.82rem; font-weight: 600; cursor: pointer;">
+                    ✕ Dismiss
+                </button>
+            </div>
+        </div>
+    `;
+
+    // Insert above the training button area
+    const algoGrid = document.getElementById("algoGrid");
+    algoGrid.parentNode.insertBefore(warning, algoGrid.nextSibling.nextSibling);
+
+    // Scroll to the warning
+    warning.scrollIntoView({ behavior: "smooth", block: "center" });
+}
+
+/** Quick-select only the 5 fast tree/boosting models */
+function autoSelectFast() {
+    const fastModels = ["Random Forest", "Gradient Boosting", "LightGBM", "CatBoost", "XGBoost"];
+    document.querySelectorAll("#algoGrid input[type=checkbox]").forEach(cb => {
+        cb.checked = fastModels.includes(cb.value);
+        cb.parentElement.classList.toggle("checked", cb.checked);
+    });
+    const existing = document.getElementById("trainLimitWarning");
+    if (existing) existing.remove();
+    showToast("Selected 5 fast tree models — ready to train!", "success");
+}
+
+/** Quick-select only the 3 neural network models */
+function autoSelectNeural() {
+    const neuralModels = ["LSTM", "Bi-LSTM", "CNN"];
+    document.querySelectorAll("#algoGrid input[type=checkbox]").forEach(cb => {
+        cb.checked = neuralModels.includes(cb.value);
+        cb.parentElement.classList.toggle("checked", cb.checked);
+    });
+    const existing = document.getElementById("trainLimitWarning");
+    if (existing) existing.remove();
+    showToast("Selected 3 neural network models — ready to train!", "success");
+}
+
 async function trainModels() {
     const checkboxes = document.querySelectorAll("#algoGrid input[type=checkbox]:checked");
     const algorithms = Array.from(checkboxes).map((cb) => cb.value);
     
     if (algorithms.length === 0) {
         showToast("Please select at least one model to train.", "error");
+        return;
+    }
+    
+    // ----------------------------------------------------------------
+    // Guard: prevent training all 8 models simultaneously – this causes
+    // the server request to time out even with gunicorn --timeout 600
+    // because all heavy models (RF + GB + LSTM + Bi-LSTM + CNN) run
+    // back-to-back in a single blocking request.
+    // ----------------------------------------------------------------
+    const MAX_MODELS = 5;
+    if (algorithms.length > MAX_MODELS) {
+        showTrainingLimitWarning(algorithms.length);
         return;
     }
     
